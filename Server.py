@@ -87,6 +87,7 @@ def threaded_service(conn):
 			request_method = request_data.split(' ')[0]
 			request_uri = request_data.split(' ')[1]
 			request_http = request_data.split(' ')[2]
+			print(request_uri)
 		except:
 			parsing = False
 		
@@ -153,6 +154,7 @@ def threaded_service(conn):
 			header = header_maker('', out, 200)
 			
 		elif('/api' in request_uri):
+			print("IN API REQUEST")
 			if(request_uri == '/api'):
 				out = '400 Bad Request'
 				header = header_maker('', out, 400)
