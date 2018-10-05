@@ -161,11 +161,13 @@ def threaded_service(conn):
 			else:
 				api_uri = request_uri.split('/')[1]
 				if(api_uri == 'hello'):
+					print("IN API HELLO")
 					if(request_method == "POST"):
 						r = requests.get('http://172.22.0.222:5000')
 						print(r.json())
 			
 				elif(api_uri == 'plusone'):
+					print("IN API PLUSONE")
 					header = header_maker('', out, 200)
 			
 		if(out == ''):
