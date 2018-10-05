@@ -161,16 +161,19 @@ def threaded_service(conn):
 				out = '400 Bad Request'
 				header = header_maker('', out, 400)
 			else:
-				api_uri = request_uri.split('/')[1]
+				api_uri = request_uri.split('/')[2]
 				if(api_uri == 'hello'):
 					print("IN API HELLO")
 					if(request_method == "POST"):
 						r = requests.get('http://172.22.0.222:5000')
 						print(r.json())
+						out = '302 Found'
+						header = header_maker('', out, 302)
 			
 				elif(api_uri == 'plusone'):
 					print("IN API PLUSONE")
-					header = header_maker('', out, 200)
+					out = '302 Found'
+					header = header_maker('', out, 302)
 			
 		if(out == ''):
 			out = '404 Not Found: Reason: '+request_uri+', '+request_method+'\n'
