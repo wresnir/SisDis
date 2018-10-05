@@ -87,7 +87,7 @@ def threaded_service(conn):
 			request_method = request_data.split(' ')[0]
 			request_uri = request_data.split(' ')[1]
 			request_http = request_data.split(' ')[2]
-			print(request_uri)
+			print(request_data)
 		except:
 			parsing = False
 		
@@ -99,6 +99,7 @@ def threaded_service(conn):
 			out = '501 Not Implemented: Reason: '+request_method+'\n'
 			header = header_maker("", out, 501)
 			
+		#CONTROLLER
 		elif(request_uri == '/'):
 			redirect_uri = '/hello-world'
 			out = '302 Found: Location: '+redirect_uri+'\n'
@@ -152,7 +153,10 @@ def threaded_service(conn):
 			elif('type' in request_uri_type):
 				out = 'No Data'
 			header = header_maker('', out, 200)
-			
+		
+		#CONTROLLER -- END
+		
+		#API CONTROLLER
 		elif('/api' in request_uri):
 			print("IN API REQUEST")
 			for api_uri in request_uri.split('/'):
@@ -174,7 +178,10 @@ def threaded_service(conn):
 					print("IN API PLUSONE")
 					out = '302 Found'
 					header = header_maker('', out, 302)
-			
+					
+		#API CONTROLLER -- END
+
+		
 		if(out == ''):
 			out = '404 Not Found: Reason: '+request_uri+', '+request_method+'\n'
 			header = header_maker('', out, 404)
