@@ -155,6 +155,8 @@ def threaded_service(conn):
 			
 		elif('/api' in request_uri):
 			print("IN API REQUEST")
+			for api_uri in request_uri.split('/'):
+				print(">>>"+api_uri)
 			if(request_uri == '/api'):
 				out = '400 Bad Request'
 				header = header_maker('', out, 400)
