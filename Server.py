@@ -3,17 +3,27 @@ import random
 import datetime
 import sys
 import requests
-from thread import *
+import yaml
+import json
+from _thread import *
 
 
-host = '172.22.0.203'
+#host = '172.22.0.203'
+host = ''
 port = 80
 server_socket =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+specs = yaml.load(open("spesifikasi.yaml", "r"))
+r = '{"state": "Morning", "datetime": "2018-10-07 09:34:19"}'
+r = json.loads(r)
+
+
+
 
 try:
 	server_socket.bind((host,port))
 except:
-	print("Binding Fail")
+	print("Binding Fail at "+host+":"+str(port))
 	
 server_socket.listen(5)
 
@@ -27,6 +37,8 @@ def code_handler(code):
 		head = 'HTTP/1.1 400 BAD REQUEST\n'
 	elif(code == 404):
 		head = 'HTTP/1.1 404 NOT FOUND\n'
+	elif(code == 405):
+		head = 'HTTP/1.1 405 METHOD NOT ALLOWED\n'
 	elif(code == 500):
 		head = 'HTTP/1.1 500 INTERNAL SERVER ERROR\n'
 	elif(code == 501):
@@ -35,17 +47,48 @@ def code_handler(code):
 	head += 'Connection: close\n'
 	return head
 	
+def api_err(detail, code):
+	out = {}
+	out["detail"] = detail
+	if(code == 200):
+		out["status"] = 200
+		out["title"] = "Ok"
+	elif(code == 302):
+		out["status"] = 302
+		out["title"] = "Found"
+	elif(code == 400):
+		out["status"] = 400
+		out["title"] = "Bad request"
+	elif(code == 404):
+		out["status"] = 404
+		out["title"] = "Not found"
+	elif(code == 405):
+		out["status"] = 405
+		out["title"] = "Method not allowed"
+	elif(code == 500):
+		out["status"] = 500
+		out["title"] = "Internal server error"
+	elif(code == 501):
+		out["status"] = 501
+		out["title"] = "Not implemented"
+		
+	return out
+	
 def mimetype_handler(file):
 	head = 'Content-Type: '
 	if(file.endswith(".jpg")):
 		head += 'image/jpg'
 	elif(file.endswith(".css")):
 		head += 'text/css'
+		head += '; charset=UTF-8\n'
 	elif(file.endswith(".html")):
 		head += 'text/html'
+		head += '; charset=UTF-8\n'
+	elif(file.endswith(".json")):
+		head += 'application/json\n'
 	else:
 		head += 'text/plain'
-	head += '; charset=UTF-8\n'
+		head += '; charset=UTF-8\n'
 	
 	return head
 	
@@ -67,8 +110,20 @@ def header_maker_redirect(file, code, uri):
 	header += len_handler(file)
 	header += '\n'
 	return header
+	
+def hello_service(req):
+	r = requests.get('http://172.22.0.222:5000')
+	r = json.load(r)
+	out = {}
+	out["apiversion"] = specs.get('info').get('version')
+	out["count"] = 1
+	out["currentvisit"] = start_service
+	out["resposne"] = "Good "+r["state"]+", "+req
+	
+	return out
 
 def threaded_service(conn):
+	start_service = str(datetime.datetime.now())
 	while True:
 		request = conn.recv(2048)
 		request_data = bytes.decode(request)
@@ -79,15 +134,10 @@ def threaded_service(conn):
 		out = ''
 		parsing = True
 		
-		#print('|=====REQUEST DATA=====|\n')
-		#print(request_data)
-		#print('|======================|\n')
-		
 		try:
 			request_method = request_data.split(' ')[0]
 			request_uri = request_data.split(' ')[1]
 			request_http = request_data.split(' ')[2]
-			print(request_data)
 		except:
 			parsing = False
 		
@@ -158,26 +208,39 @@ def threaded_service(conn):
 		
 		#API CONTROLLER
 		elif('/api' in request_uri):
-			print("IN API REQUEST")
-			for api_uri in request_uri.split('/'):
-				print(">>>"+api_uri)
 			if(request_uri == '/api'):
 				out = '400 Bad Request'
 				header = header_maker('', out, 400)
 			else:
-				api_uri = request_uri.split('/')[2]
-				if(api_uri == 'hello'):
-					print("IN API HELLO")
-					if(request_method == "POST"):
-						r = requests.get('http://172.22.0.222:5000')
-						print(r.json())
-						out = '302 Found'
-						header = header_maker('', out, 302)
-			
-				elif(api_uri == 'plusone'):
-					print("IN API PLUSONE")
-					out = '302 Found'
-					header = header_maker('', out, 302)
+				req_uri = request_uri.split('/')[2]
+				api_path = specs.get('paths').get('/'+req_uri)
+				if(api_path == None):
+					out = '404 Not Found'
+					header = header_maker('', out, 404)
+				else:
+					api_def = specs.get('definitions')
+					
+					#/hello
+					if(req_uri == 'hello'):
+						if(request_method == "POST"):
+							api_params = api_def.get('Request').get('required')
+							api_data = json.loads(request_data.split('\n')[-1])
+							out = ""
+							header = ""
+							try:
+								out = json.dumps(hello_service(api_data[api_params[0]]))
+								header = header_maker(".json", out, 200)
+							except:
+								err_cause = "'request' is a required property"
+								out = json.dumps(api_err(err_cause, 400))
+								header = header_maker(".json", out, 400)
+					#/plusone
+					#elif(api_path == 'plusone'):
+					
+					
+						# TODO
+						# 1. Parameter Checking
+						# 2. Implement api function if pass
 					
 		#API CONTROLLER -- END
 
