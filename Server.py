@@ -310,6 +310,7 @@ def Main():
 	signal.signal(signal.SIGCHLD, zombie_killer)
 
 	while True:
+		rand_value = str(random.randint(-sys.maxsize-1, sys.maxsize))
 		try:
 			conn, addr = server_socket.accept()
 		except IOError as e:

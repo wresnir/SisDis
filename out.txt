@@ -1,5 +1,1 @@
 nohup: ignoring input
-Traceback (most recent call last):
-  File "Server.py", line 19, in <module>
-    count = int(json.loads(open("data.json", "r"))["count"])
-IOError: [Errno 2] No such file or directory: 'data.json'
