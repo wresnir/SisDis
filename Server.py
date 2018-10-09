@@ -42,6 +42,24 @@ def getBody(req):
 			out += line
 				
 	return out
+	
+def getMime(req):
+	for line in req.split("\n"):
+		if("content-type:" in line.strip().rstrip().lower()):
+			if("application/json" in line.strip().rstrip().lower()):
+				return True
+				
+	return False
+	
+def getAcc(req):
+	for line in req.split("\n"):
+		if("accept" in line.strip().rstrip().lower()):
+			if("*/*" in line.strip().rstrip().lower()):
+				return True
+			elif("application/json" in line.strip().rstrip().lower()):
+				return True
+				
+	return False
 
 def code_handler(code):
 	head = ''
@@ -247,9 +265,21 @@ def threaded_service(conn):
 		else:
 			req_uri = request_uri.split('/')[2]
 			api_def = specs.get('definitions')
+			checker = True
+			
+			if(not getAcc(request_data)):
+				out = "Accept content is not json"
+				out = json.dumps(api_err(out, 400), sort_keys = True)
+				header = header_maker(".json", out, 400)
+				checker = False
+			elif(not getMime(request_data)):
+				out = "Content-type is not json"
+				out = json.dumps(api_err(out, 400), sort_keys = True)
+				header = header_maker(".json", out, 400)
+				checker = False
 			
 			#/hello
-			if(req_uri == 'hello'):
+			if(req_uri == 'hello' and checker):
 				if(request_method == "POST"):
 					api_params = api_def.get('Request').get('required')
 					if(getBody(request_data).strip().rstrip() != ""):
@@ -271,7 +301,7 @@ def threaded_service(conn):
 					header = header_maker(".json", out, 405)
 					
 			#/plusone
-			elif(req_uri == "plusone" or req_uri == "plus_one"):
+			elif((req_uri == "plusone" or req_uri == "plus_one") and checker):
 				if(request_method == "GET"):
 					try:
 						api_params = int(request_uri.split('/')[3])
@@ -281,6 +311,10 @@ def threaded_service(conn):
 						out = "The requested URL was not found on the server.  If you entered the URL manually please check your spelling and try again."
 						out = json.dumps(api_err(out, 404), sort_keys = True)
 						header = header_maker(".json", out, 404)
+				else:
+					out = "Method "+request_method+" is not allowed"
+					out = json.dumps(api_err(out, 405), sort_keys = True)
+					header = header_maker(".json", out, 405)
 				
 			elif(req_uri == 'spesifikasi.yaml'):	
 				out = yaml.load(open('spesifikasi.yaml', 'r'))
