@@ -17,7 +17,6 @@ REQUEST_QUEUE_SIZE = 1024
 
 specs = yaml.load(open("spesifikasi.yaml", "r"))
 start_service = ''
-rand_value = str(random.randint(-sys.maxsize-1, sys.maxsize))
 
 def zombie_killer(signum, frame):
 	while True:
@@ -231,7 +230,7 @@ def threaded_service(conn):
 	elif(request_uri.split('?')[0] == '/info'):
 		request_uri_type = request_uri.split('?')[1]
 		if(request_uri_type == 'type=random'):
-			out = rand_value
+			out = str(random.randint(-(1 << 32), (1 << 32)))
 		elif(request_uri_type == 'type=time'):
 			out = str(datetime.datetime.now())
 		elif('type' in request_uri_type):
@@ -311,7 +310,6 @@ def Main():
 	signal.signal(signal.SIGCHLD, zombie_killer)
 
 	while True:
-		rand_value = str(random.randint(-sys.maxsize-1, sys.maxsize))
 		try:
 			conn, addr = server_socket.accept()
 		except IOError as e:
