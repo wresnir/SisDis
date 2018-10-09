@@ -5,7 +5,7 @@ import sys
 import requests
 import yaml
 import json
-from _thread import *
+from thread import *
 
 
 #host = '172.22.0.203'
@@ -16,6 +16,7 @@ server_socket =  socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 specs = yaml.load(open("spesifikasi.yaml", "r"))
 r = '{"state": "Morning", "datetime": "2018-10-07 09:34:19"}'
 r = json.loads(r)
+start_service = ''
 
 
 
@@ -26,6 +27,18 @@ except:
 	print("Binding Fail at "+host+":"+str(port))
 	
 server_socket.listen(5)
+
+def getBody(req):
+	body = False
+	out = ""
+	
+	for line in req.split("\n"):
+		if(line.strip().rstrip() == ""):
+			body = True
+		if(body):
+			out += line
+				
+	return out
 
 def code_handler(code):
 	head = ''
@@ -86,6 +99,9 @@ def mimetype_handler(file):
 		head += '; charset=UTF-8\n'
 	elif(file.endswith(".json")):
 		head += 'application/json\n'
+	elif(file.endswith(".yaml")):
+		head += 'text/x-yaml\n'
+		head += '; charset=UTF-8\n'
 	else:
 		head += 'text/plain'
 		head += '; charset=UTF-8\n'
@@ -113,23 +129,30 @@ def header_maker_redirect(file, code, uri):
 	
 def hello_service(req):
 	r = requests.get('http://172.22.0.222:5000')
-	r = json.load(r)
+	r = r.json()
 	out = {}
 	out["apiversion"] = specs.get('info').get('version')
 	out["count"] = 1
 	out["currentvisit"] = start_service
-	out["resposne"] = "Good "+r["state"]+", "+req
+	out["response"] = "Good "+r["state"]+", "+req
+	
+	return out
+	
+def plusone_service(req):
+	out = {}
+	out["apiversion"] = specs.get('info').get('version')
+	out["plusoneret"] = req
 	
 	return out
 
 def threaded_service(conn):
-	start_service = str(datetime.datetime.now())
 	while True:
 		request = conn.recv(2048)
 		request_data = bytes.decode(request)
 		request_method = ''
 		request_uri = ''
 		request_http = ''
+		request_body = ''
 		header = ''
 		out = ''
 		parsing = True
@@ -138,6 +161,7 @@ def threaded_service(conn):
 			request_method = request_data.split(' ')[0]
 			request_uri = request_data.split(' ')[1]
 			request_http = request_data.split(' ')[2]
+			request_body = getBody(request_body)
 		except:
 			parsing = False
 		
@@ -213,53 +237,64 @@ def threaded_service(conn):
 				header = header_maker('', out, 400)
 			else:
 				req_uri = request_uri.split('/')[2]
-				api_path = specs.get('paths').get('/'+req_uri)
-				if(api_path == None):
-					out = '404 Not Found'
-					header = header_maker('', out, 404)
-				else:
-					api_def = specs.get('definitions')
+				api_def = specs.get('definitions')
+				
+				#/hello
+				if(req_uri == 'hello'):
+					if(request_method == "POST"):
+						api_params = api_def.get('Request').get('required')
+						if(getBody(request_data).strip().rstrip() != ""):
+							api_data = json.loads(getBody(request_data))
+						else:
+							api_data = {}
+						out = ""
+						header = ""
+						try:
+							out = json.dumps(hello_service(api_data[api_params[0]]), sort_keys = True)
+							header = header_maker(".json", out, 200)
+						except:
+							out = "'request' is a required property"
+							out = json.dumps(api_err(out, 400), sort_keys = True)
+							header = header_maker(".json", out, 400)
+					else:
+						out = "Method "+request_method+" is not allowed"
+						out = json.dumps(api_err(out, 405), sort_keys = True)
+						header = header_maker(".json", out, 405)
+						
+				#/plusone
+				elif(req_uri == "plusone" or req_uri == "plus_one"):
+					if(request_method == "GET"):
+						try:
+							api_params = int(request_uri.split('/')[3])
+							out = json.dumps(plusone_service(api_params+1))
+							header = header_maker(".json", out, 200)
+						except:
+							out = "The requested URL was not found on the server.  If you entered the URL manually please check your spelling and try again."
+							out = json.dumps(api_err(out, 404), sort_keys = True)
+							header = header_maker(".json", out, 404)
 					
-					#/hello
-					if(req_uri == 'hello'):
-						if(request_method == "POST"):
-							api_params = api_def.get('Request').get('required')
-							api_data = json.loads(request_data.split('\n')[-1])
-							out = ""
-							header = ""
-							try:
-								out = json.dumps(hello_service(api_data[api_params[0]]))
-								header = header_maker(".json", out, 200)
-							except:
-								err_cause = "'request' is a required property"
-								out = json.dumps(api_err(err_cause, 400))
-								header = header_maker(".json", out, 400)
-					#/plusone
-					#elif(api_path == 'plusone'):
-					
-					
-						# TODO
-						# 1. Parameter Checking
-						# 2. Implement api function if pass
-					
+				elif(req_uri == 'spesifikasi.yaml'):	
+					out = yaml.load(open('spesifikasi.yaml', 'r'))
+					out = yaml.dump(out, default_flow_style=False)
+					header = header_maker(".yaml", out, 200)
+						
 		#API CONTROLLER -- END
 
-		
 		if(out == ''):
 			out = '404 Not Found: Reason: '+request_uri+', '+request_method+'\n'
 			header = header_maker('', out, 404)
 		
 		if(parsing):
-			conn.send(header.encode('utf-8'))
+			conn.sendall(header.encode('utf-8'))
 			try:
 				out = out.encode('utf-8')
 			except:
 				out = out
-			conn.send(out)
-			
+			conn.sendall(out)
 	conn.close()
 
 while True:
+	start_service = str(datetime.datetime.now())
 	conn, addr = server_socket.accept()
 	start_new_thread(threaded_service, (conn,))
 	
